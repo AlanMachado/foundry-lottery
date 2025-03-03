@@ -24,7 +24,11 @@ contract Raffle {
     }
 
     function enterRaffle() public payable {
-        // require(msg.value >= i_entranceFee, Raffle__InsufficientEntranceFee()); this is still less gas eficient than...
+        /**
+         * this error treatment is more gas efficient than using require with a string message or require with error object, example:
+         * require(msg.value >= i_entranceFee, "Value is insufficient to enter the Raffle");
+         * require(msg.value >= i_entranceFee, Raffle__InsufficientEntranceFee());
+         */
         if (msg.value < i_entranceFee) {
             revert Raffle__InsufficientEntranceFee();
         }
