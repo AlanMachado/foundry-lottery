@@ -13,17 +13,22 @@ contract Raffle {
      * Syntax [Contract_name]__[ErrorHandling]
      */
     error Raffle__InsufficientEntranceFee();
+    error Raffle__InsufficientInterval();
 
     uint256 private immutable i_entranceFee;
+    uint256 private immutable i_interval;
+    uint256 private s_lastTimeStamp;
     address payable [] private s_players;
 
     event RaffleAccepted(address index player);
 
-    constructor(uint256 entranceFee) {
+    constructor(uint256 entranceFee,uint256 interval) {
         i_entranceFee = entranceFee;
+        i_interval = interval;
+        s_lastTimeStamp = block.timestamp;
     }
 
-    function enterRaffle() public payable {
+    function enterRaffle() external payable {
         /**
          * this error treatment is more gas efficient than using require with a string message or require with error object, example:
          * require(msg.value >= i_entranceFee, "Value is insufficient to enter the Raffle");
@@ -37,8 +42,10 @@ contract Raffle {
         emit RaffleAccepted(msg.sender);
     }
 
-    function pickWinner() public {
-
+    function pickWinner() external {
+        if ((block.timestamp - s_lastTimeStamp) > i_interval) {
+            revert Raffle__InsufficientInterval();
+        }
     }
 
     function getEntranceFee() external view returns(uint256) {
