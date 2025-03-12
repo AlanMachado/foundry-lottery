@@ -17,6 +17,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     error Raffle__InsufficientInterval();
     error Raffle__TransferFailed();
     error Raffle__CalculatingWinner();
+    error Raffle__NotReadyTOPickWinner();
 
     /* Type Declarations */
     enum RaffleState {
@@ -38,8 +39,8 @@ contract Raffle is VRFConsumerBaseV2Plus {
     RaffleState private s_raffleState;
 
     /* Events Syntax [ContractName][Event](<params>); */
-    event RaffleAccepted(address player);
-    event RaffleWinnerPicked(address winner);
+    event RaffleAccepted(address indexed player);
+    event RaffleWinnerPicked(address indexed winner);
 
     modifier onlyWhenOpen() {
         if (s_raffleState != RaffleState.OPEN) {
@@ -73,10 +74,33 @@ contract Raffle is VRFConsumerBaseV2Plus {
         emit RaffleAccepted(msg.sender);
     }
 
-    function pickWinner() external {
-        if ((block.timestamp - s_lastTimeStamp) > i_interval) {
-            revert Raffle__InsufficientInterval();
+    /**
+     * @dev this is the function that the Chainlink nodes will call to see 
+     * if the lottery is ready to have a winner picked.
+     * the following should be true in order for upkeepNeeded to be true:
+     * 1. the time interval has passed between raffle runs
+     * 2. the lottery is open
+     * 3. the contract has ETH
+     * 4. Implicitly, your subscription has LINK
+     * @param - ignored
+     * @return upkeepNeeded - true if it's time to restart the lottery 
+     * @return - ignored
+     */
+    function checkUpkeep(bytes calldata /* checkData */) public view returns(bool upkeepNeeded, bytes memory /* performData */) {
+        bool timeHasPassed = ((block.timestamp - s_lastTimeStamp) >= i_interval);
+        bool isOpen = s_raffleState == RaffleState.OPEN;
+        bool hasBalance = address(this).balance > 0;
+        bool hasPlayers = s_players.length > 0;
+
+        upkeepNeeded = timeHasPassed && isOpen && hasBalance && hasPlayers;
+    }
+
+    function performUpkeep(butes memory /* performData */) external {
+        (bool upkeepNeeded, ) = checkUpkeep("");
+        if (!upkeepNeeded) {
+            revert Raffle__NotReadyTOPickWinner();
         }
+
         s_raffleState = RaffleState.CALCULATING;
         uint256 requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
