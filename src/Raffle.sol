@@ -14,10 +14,9 @@ contract Raffle is VRFConsumerBaseV2Plus {
     
     /* Errors Syntax [ContractName]__[ErrorHandling] */
     error Raffle__InsufficientEntranceFee();
-    error Raffle__InsufficientInterval();
     error Raffle__TransferFailed();
     error Raffle__CalculatingWinner();
-    error Raffle__NotReadyTOPickWinner();
+    error Raffle__NotReadyToPickWinner(uint256 balance, uint256 playersLenght, uint256 raffleState);
 
     /* Type Declarations */
     enum RaffleState {
@@ -86,23 +85,24 @@ contract Raffle is VRFConsumerBaseV2Plus {
      * @return upkeepNeeded - true if it's time to restart the lottery 
      * @return - ignored
      */
-    function checkUpkeep(bytes calldata /* checkData */) public view returns(bool upkeepNeeded, bytes memory /* performData */) {
+    function checkUpkeep(bytes memory /* checkData */) public view returns(bool upkeepNeeded, bytes memory /* performData */) {
         bool timeHasPassed = ((block.timestamp - s_lastTimeStamp) >= i_interval);
         bool isOpen = s_raffleState == RaffleState.OPEN;
         bool hasBalance = address(this).balance > 0;
         bool hasPlayers = s_players.length > 0;
 
         upkeepNeeded = timeHasPassed && isOpen && hasBalance && hasPlayers;
+        return (upkeepNeeded, "");
     }
 
-    function performUpkeep(butes memory /* performData */) external {
+    function performUpkeep(bytes calldata /* performData */) external {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
-            revert Raffle__NotReadyTOPickWinner();
+            revert Raffle__NotReadyToPickWinner(address(this).balance, s_players.length, uint256(s_raffleState));
         }
 
         s_raffleState = RaffleState.CALCULATING;
-        uint256 requestId = s_vrfCoordinator.requestRandomWords(
+        s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
                 keyHash: i_keyHash,
                 subId: i_subscriptionId,
@@ -120,7 +120,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
      * We're picking the winner, since the number of words that we request is always 1, the array randomWords will have only one value.
      * the index is the module of this value by the number of players.
      */
-    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
+    function fulfillRandomWords(uint256 /* requestId */, uint256[] calldata randomWords) internal override {
         uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
