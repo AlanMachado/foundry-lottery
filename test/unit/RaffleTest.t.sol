@@ -20,6 +20,9 @@ contract RaffleTest is Test {
     address public PLAYER = makeAddr("player");
     uint256 public constant STARTING_PLAYER_BALANCE = 10 ether;
 
+    event RaffleAccepted(address indexed player);
+    event RaffleWinnerPicked(address indexed winner);
+
     function setUp() external {
         DeployRaffle deployer = new DeployRaffle();
         (raffle, helperConfig) = deployer.deployContract();
@@ -30,9 +33,38 @@ contract RaffleTest is Test {
         gasLane = config.gasLane;
         callbackGasLimit = config.callbackGasLimit;
         subscriptionId = config.subscriptionId;
+
+        vm.deal(PLAYER, STARTING_PLAYER_BALANCE);
     }
 
     function testRaffleInitializedInOpenState() public view {
         assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
+    }
+
+    function testRaffleRevertsWhenYouDontPayEnough() public {
+        vm.prank(PLAYER);
+        vm.expectRevert(Raffle.Raffle__InsufficientEntranceFee.selector);
+        raffle.enterRaffle();
+    }
+
+    function testRaffleRecordsPlayersWhenTheyEnter() public {
+        vm.prank(PLAYER);
+        raffle.enterRaffle{value: entranceFee}();
+        address playerRecorded = raffle.getPlayer(0);
+
+        assert(playerRecorded == PLAYER);
+    }
+
+    function testEnteringRaffleEmitsEvent() public {
+        vm.prank(PLAYER);
+        /**
+         * first three booleans is to validate the three possible indexed parameters allowed on events,
+         * since this event has only one, only the first is true. The fourth boolean parameter is to validate 
+         * if we have any data not indexed, and the address parameter is the emiter address.
+         */
+        vm.expectEmit(true, false, false, false, address(raffle));
+        emit RaffleAccepted(PLAYER);
+
+        raffle.enterRaffle{value: entranceFee}();
     }
 }
