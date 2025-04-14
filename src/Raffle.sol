@@ -40,6 +40,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     /* Events Syntax [ContractName][Event](<params>); */
     event RaffleAccepted(address indexed player);
     event RaffleWinnerPicked(address indexed winner);
+    event RequestedRaffleWinner(uint256 indexed requestId);
 
     modifier onlyWhenOpen() {
         if (s_raffleState != RaffleState.OPEN) {
@@ -102,7 +103,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
         }
 
         s_raffleState = RaffleState.CALCULATING;
-        s_vrfCoordinator.requestRandomWords(
+        uint256 requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
                 keyHash: i_keyHash,
                 subId: i_subscriptionId,
@@ -114,6 +115,9 @@ contract Raffle is VRFConsumerBaseV2Plus {
                 )
             })
         );
+
+        /* this is redundant, chainlink already emits an event with the requestId, however will easier testing */
+        emit RequestedRaffleWinner(requestId);
     }
 
     /**
